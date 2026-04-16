@@ -1,0 +1,10 @@
+build/
+*.o
+*.moc
+.qt/
+CMakeFiles/
+cmake_install.cmake
+Makefile
+CMakeCache.txt
+pinentry-hypr
+.qmlls.ini
