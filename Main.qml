@@ -6,7 +6,7 @@ ApplicationWindow {
     id: window
 
     property var windowWidth: Math.round(fontMetrics.height * 32.2856)
-    property var windowHeight: Math.round(fontMetrics.height * 15.9528) 
+    property var windowHeight: Math.round(fontMetrics.height * 15.9528)
     property var heightSafeMargin: 15
 
     minimumWidth: Math.max(windowWidth, mainLayout.Layout.minimumWidth) + mainLayout.anchors.margins * 2
@@ -24,33 +24,50 @@ ApplicationWindow {
 
     SystemPalette {
         id: system
-
         colorGroup: SystemPalette.Active
     }
 
     Item {
         id: mainLayout
-
         anchors.fill: parent
         Keys.onEscapePressed: (e) => {
-            bridge.cancel();
+            if (bridge.mode === "confirm") {
+                bridge.confirmCancel();
+            } else {
+                bridge.cancel();
+            }
         }
         Keys.onReturnPressed: (e) => {
-            bridge.submit(passwordField.text);
+            if (bridge.mode === "getpin") {
+                bridge.submit(passwordField.text);
+            } else if (bridge.mode === "confirm") {
+                bridge.confirmOk();
+            } else {
+                bridge.messageOk();
+            }
         }
         Keys.onEnterPressed: (e) => {
-            bridge.submit(passwordField.text);
+            if (bridge.mode === "getpin") {
+                bridge.submit(passwordField.text);
+            } else if (bridge.mode === "confirm") {
+                bridge.confirmOk();
+            } else {
+                bridge.messageOk();
+            }
         }
 
+        // ---- GETPIN mode (existing) ----
         ColumnLayout {
+            id: getpinLayout
             anchors.fill: parent
             anchors.margins: 4
+            visible: bridge.mode === "getpin"
 
             Label {
                 color: Qt.darker(system.windowText, 0.8)
                 font.bold: true
                 font.pointSize: Math.round(fontMetrics.height * 1.05)
-                text: "Authenticating for GnuPG"
+                text: bridge.titleText.length > 0 ? bridge.titleText : "Authenticating for GnuPG"
                 Layout.alignment: Qt.AlignHCenter
                 Layout.maximumWidth: parent.width
                 elide: Text.ElideRight
@@ -71,7 +88,7 @@ ApplicationWindow {
                 horizontalAlignment: Text.AlignHCenter
             }
 
-            // Password Field and Show Toggle on the same row
+            // Password Field and Show Toggle
             RowLayout {
                 Layout.alignment: Qt.AlignHCenter
                 Layout.topMargin: fontMetrics.height / 2
@@ -79,7 +96,7 @@ ApplicationWindow {
 
                 TextField {
                     id: passwordField
-                    placeholderText: "Password"
+                    placeholderText: bridge.prompt
                     hoverEnabled: true
                     persistentSelection: true
                     echoMode: showPassword.checked ? TextInput.Normal : TextInput.Password
@@ -95,7 +112,6 @@ ApplicationWindow {
                     id: showPassword
                     text: "Show"
                     hoverEnabled: true
-                    
                     contentItem: Text {
                         text: parent.text
                         font.pixelSize: Math.round(fontMetrics.height * 0.8)
@@ -106,7 +122,7 @@ ApplicationWindow {
                 }
             }
 
-            // Remember Password below
+            // Remember Password
             CheckBox {
                 id: rememberCheck
                 text: bridge.pwmngrLabel
@@ -115,7 +131,6 @@ ApplicationWindow {
                 onCheckedChanged: bridge.remember = checked
                 Layout.alignment: Qt.AlignHCenter
                 Layout.topMargin: fontMetrics.height / 4
-                
                 contentItem: Text {
                     text: parent.text
                     font.pixelSize: Math.round(fontMetrics.height * 0.8)
@@ -123,6 +138,15 @@ ApplicationWindow {
                     leftPadding: parent.indicator.width + parent.spacing
                     verticalAlignment: Text.AlignVCenter
                 }
+            }
+
+            // Timeout display
+            Label {
+                visible: bridge.timeout > 0
+                color: system.windowText
+                text: "Time remaining: " + bridge.remainingTime + "s"
+                Layout.alignment: Qt.AlignHCenter
+                font.pixelSize: Math.round(fontMetrics.height * 0.7)
             }
 
             Rectangle {
@@ -141,7 +165,7 @@ ApplicationWindow {
                 spacing: 10
 
                 Button {
-                    text: "Cancel"
+                    text: bridge.cancelText.length > 0 ? bridge.cancelText : "Cancel"
                     onClicked: (e) => {
                         bridge.cancel();
                     }
@@ -153,11 +177,139 @@ ApplicationWindow {
                         bridge.submit(passwordField.text);
                     }
                 }
-
             }
-
         }
 
+        // ---- CONFIRM mode ----
+        ColumnLayout {
+            id: confirmLayout
+            anchors.fill: parent
+            anchors.margins: 4
+            visible: bridge.mode === "confirm"
+
+            Label {
+                color: Qt.darker(system.windowText, 0.8)
+                font.bold: true
+                font.pointSize: Math.round(fontMetrics.height * 1.05)
+                text: bridge.titleText.length > 0 ? bridge.titleText : "Confirmation"
+                Layout.alignment: Qt.AlignHCenter
+                Layout.maximumWidth: parent.width
+                elide: Text.ElideRight
+                wrapMode: Text.WordWrap
+            }
+
+            HSeparator {
+                Layout.topMargin: fontMetrics.height / 2
+                Layout.bottomMargin: fontMetrics.height / 2
+            }
+
+            Label {
+                color: system.windowText
+                text: bridge.desc
+                Layout.maximumWidth: parent.width
+                elide: Text.ElideRight
+                wrapMode: Text.WordWrap
+                horizontalAlignment: Text.AlignHCenter
+                Layout.fillHeight: true
+                verticalAlignment: Text.AlignVCenter
+            }
+
+            // Timeout display
+            Label {
+                visible: bridge.timeout > 0
+                color: system.windowText
+                text: "Time remaining: " + bridge.remainingTime + "s"
+                Layout.alignment: Qt.AlignHCenter
+                font.pixelSize: Math.round(fontMetrics.height * 0.7)
+            }
+
+            HSeparator {
+                Layout.topMargin: fontMetrics.height / 2
+                Layout.bottomMargin: fontMetrics.height / 2
+            }
+
+            RowLayout {
+                Layout.alignment: Qt.AlignRight
+                Layout.rightMargin: fontMetrics.height / 2
+                spacing: 10
+
+                Button {
+                    text: bridge.cancelText.length > 0 ? bridge.cancelText : "Cancel"
+                    onClicked: (e) => {
+                        bridge.confirmCancel();
+                    }
+                }
+
+                Button {
+                    text: bridge.okText.length > 0 ? bridge.okText : "OK"
+                    onClicked: (e) => {
+                        bridge.confirmOk();
+                    }
+                }
+            }
+        }
+
+        // ---- MESSAGE mode ----
+        ColumnLayout {
+            id: messageLayout
+            anchors.fill: parent
+            anchors.margins: 4
+            visible: bridge.mode === "message"
+
+            Label {
+                color: Qt.darker(system.windowText, 0.8)
+                font.bold: true
+                font.pointSize: Math.round(fontMetrics.height * 1.05)
+                text: bridge.titleText.length > 0 ? bridge.titleText : "Information"
+                Layout.alignment: Qt.AlignHCenter
+                Layout.maximumWidth: parent.width
+                elide: Text.ElideRight
+                wrapMode: Text.WordWrap
+            }
+
+            HSeparator {
+                Layout.topMargin: fontMetrics.height / 2
+                Layout.bottomMargin: fontMetrics.height / 2
+            }
+
+            Label {
+                color: bridge.errorText.length > 0 ? "red" : system.windowText
+                text: bridge.errorText.length > 0 ? bridge.errorText : bridge.desc
+                Layout.maximumWidth: parent.width
+                elide: Text.ElideRight
+                wrapMode: Text.WordWrap
+                horizontalAlignment: Text.AlignHCenter
+                Layout.fillHeight: true
+                verticalAlignment: Text.AlignVCenter
+            }
+
+            // Timeout display
+            Label {
+                visible: bridge.timeout > 0
+                color: system.windowText
+                text: "Time remaining: " + bridge.remainingTime + "s"
+                Layout.alignment: Qt.AlignHCenter
+                font.pixelSize: Math.round(fontMetrics.height * 0.7)
+            }
+
+            HSeparator {
+                Layout.topMargin: fontMetrics.height / 2
+                Layout.bottomMargin: fontMetrics.height / 2
+            }
+
+            RowLayout {
+                Layout.alignment: Qt.AlignRight
+                Layout.rightMargin: fontMetrics.height / 2
+                spacing: 10
+
+                Button {
+                    text: bridge.okText.length > 0 ? bridge.okText : "OK"
+                    onClicked: (e) => {
+                        bridge.messageOk();
+                    }
+                }
+            }
+        }
     }
 
     component Separator: Rectangle {
@@ -170,5 +322,4 @@ ApplicationWindow {
         Layout.leftMargin: fontMetrics.height * 8
         Layout.rightMargin: fontMetrics.height * 8
     }
-
 }
