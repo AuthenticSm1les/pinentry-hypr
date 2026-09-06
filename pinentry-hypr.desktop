@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Name=Pinentry Hypr
+GenericName=GnuPG Pinentry
+Comment=A Hyprland-native GnuPG pinentry
+Exec=pinentry-hypr
+Icon=pinentry
+Terminal=false
+Type=Application
+NoDisplay=true
+Categories=Qt;Utility;Security;

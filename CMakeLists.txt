@@ -29,6 +29,7 @@ qt_add_executable(pinentry-hypr
 qt_add_qml_module(pinentry-hypr
     URI PinentryHypr
     VERSION 1.0
+    RESOURCE_PREFIX "/"
     QML_FILES Main.qml
 )
 
@@ -61,3 +62,4 @@ if(BUILD_TESTS)
 endif()
 
 install(TARGETS pinentry-hypr DESTINATION bin)
+install(FILES pinentry-hypr.desktop DESTINATION share/applications)
